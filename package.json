@@ -1,0 +1,21 @@
+{
+  "name": "fpl-radar",
+  "version": "1.0.0",
+  "description": "FPL Radar - Data Analysis Tool",
+  "main": "js/app.js",
+  "scripts": {
+    "test": "vitest"
+  },
+  "keywords": [
+    "fpl",
+    "football",
+    "data"
+  ],
+  "dependencies": {},
+  "devDependencies": {
+    "vitest": "^1.2.0",
+    "jsdom": "^23.0.0",
+    "@testing-library/dom": "^9.3.0"
+  },
+  "type": "module"
+}

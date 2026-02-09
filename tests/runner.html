@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPL Radar Verification Parser</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #f0f0f0;
+        }
+
+        .pass {
+            color: #4ade80;
+        }
+
+        .fail {
+            color: #f87171;
+        }
+
+        .pending {
+            color: #fbbf24;
+        }
+
+        .summary {
+            margin-top: 20px;
+            border-top: 1px solid #444;
+            padding-top: 10px;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>FPL Radar Verification</h1>
+    <div id="output">Initializing...</div>
+
+    <script type="module">
+        import { CustomDumpParser } from '../js/parsers/CustomDumpParser.js';
+        import { ShotsParser } from '../js/parsers/ShotsParser.js';
+        import { PassesParser } from '../js/parsers/PassesParser.js';
+        import { DataManager } from '../js/logic/DataManager.js';
+        import { StatCalculator } from '../js/logic/StatCalculator.js';
+
+        // Verification Logic
+        const output = document.getElementById('output');
+        const log = (msg, type = 'info') => {
+            const div = document.createElement('div');
+            div.textContent = msg;
+            div.className = type;
+            output.appendChild(div);
+            // Scroll to bottom
+            window.scrollTo(0, document.body.scrollHeight);
+        };
+
+        const assert = (condition, message) => {
+            if (condition) {
+                log(`✓ ${message}`, 'pass');
+                return true;
+            } else {
+                log(`✗ ${message}`, 'fail');
+                console.error(`Assertion failed: ${message}`);
+                return false;
+            }
+        };
+
+        // Main Test Runner
+        async function runTests() {
+            log('Starting verification...', 'pending');
+            let passed = 0;
+            let failed = 0;
+
+            try {
+                log('Checking environment...', 'pending');
+
+                // 1. Verify Dump Data (CustomDumpParser)
+                await testParser('stat dump _ Fantasy Football Scout Members Area.html', CustomDumpParser, 'CustomDumpParser', ['Big Chances Total', 'cost', 'Chances Created', 'FPL DC % Strt']);
+
+                // 2. Verify Shots Data (ShotsParser)
+                await testParser('StatsBomb - Shots _ Outfield Players _ Fantasy Football Scout Members Area.html', ShotsParser, 'ShotsParser', ['npxG', 'Shots']);
+
+                // 3. Verify Passes Data (PassesParser)
+                // Note: File name might vary, trying strict name or generic guess
+                // "StatsBomb - Passes _ Outfield Players _ Fantasy Football Scout Members Area.html" ?
+                // We'll skip fetch test for Passes if file is not surely there, but try the most likely name
+                await testParser('StatsBomb - Passes _ Outfield Players _ Fantasy Football Scout Members Area.html', PassesParser, 'PassesParser', ['xA']);
+
+                // 4. Integration Test: Data Merge & Display
+                log('-----------------------------------');
+                log('Testing Data Integration & UI Logic...', 'pending');
+
+                // Fetch all raw content
+                const [dump, shots, passes] = await Promise.all([
+                    fetchRaw('../../stat dump _ Fantasy Football Scout Members Area.html'),
+                    fetchRaw('../../StatsBomb - Shots _ Outfield Players _ Fantasy Football Scout Members Area.html'),
+                    fetchRaw('../../StatsBomb - Passes _ Outfield Players _ Fantasy Football Scout Members Area.html')
+                ]);
+
+                if (dump && shots && passes) {
+                    const pDump = new CustomDumpParser().parse(new DOMParser().parseFromString(dump, 'text/html'));
+                    const pShots = new ShotsParser().parse(new DOMParser().parseFromString(shots, 'text/html'));
+                    const pPasses = new PassesParser().parse(new DOMParser().parseFromString(passes, 'text/html'));
+
+                    // Test DataManager
+                    const merged = DataManager.mergePlayerData(pDump, pShots, pPasses);
+                    if (assert(merged.length > 0, `DataManager: Merged ${merged.length} players`)) passed++; else failed++;
+
+                    // Find a specific test player (Brenden Aaronson)
+                    // Note: Name might be "Brenden Aaronson" or "Aaronson" depending on source
+                    const playerName = 'Aaronson';
+                    const player = merged.find(p => p.name.includes(playerName) || p.displayName.includes(playerName));
+
+                    if (player) {
+                        // Test StatCalculator integration
+                        const teamStats = {};
+                        const computed = StatCalculator.calculate(player, teamStats, merged);
+
+                        const npxg90 = computed['npxG/90'];
+                        const mins = computed['minutes'];
+                        const npxg = computed['npxG'] || player['npxG'];
+
+                        log(`Integration Check for ${playerName}:`);
+                        log(`- Minutes: ${mins}`);
+                        log(`- npxG (Total): ${npxg}`);
+                        log(`- npxG/90: ${npxg90?.toFixed(2)}`);
+
+                        if (assert(mins > 0, `Data Integration: Found Minutes (${mins})`)) passed++; else failed++;
+                        if (assert(npxg > 0, `Data Integration: Found npxG (${npxg})`)) passed++; else failed++;
+
+
+                        const defconHR = computed['Defcon HR%'];
+                        if (assert(defconHR !== undefined, `Calculation: Computed Defcon HR% (${defconHR})`)) passed++; else failed++;
+
+                        if (assert(typeof npxg90 === 'number' && npxg90 > 0, `Calculation: Computed npxG/90 (${npxg90?.toFixed(2)})`)) passed++; else failed++;
+
+                        // Test UI Rendering (Simulation)
+                        const displayValue = npxg90 ? npxg90.toFixed(2) : "0.00";
+                        if (assert(displayValue !== "0.00", `UI Check: Value "${displayValue}" is ready for table`)) passed++; else failed++;
+
+
+                    } else {
+                        log('Could not find test player (van Hecke) for integration test', 'fail');
+                        failed++;
+                    }
+
+
+                    // Test 2: Check Brighton Player (BHA -> Brighton and Hove Albion mapping)
+                    // Trying 'van Hecke' as he was seen in the dump file
+                    const bhaPlayer = merged.find(p => p.name.includes('van Hecke'));
+
+                    if (bhaPlayer) {
+                        log('-----------------------------------');
+                        log(`Found BHA Test Player: ${bhaPlayer.name}`);
+                        log(`- Team (Raw): "${bhaPlayer.team}"`);
+
+
+                        const [defTeamRaw, expTeamRaw] = await Promise.all([
+                            fetchRaw('../../Defending _ Team Stats _ Fantasy Football Scout Members Area.html'),
+                            fetchRaw('../../Expected _ Team Stats _ Fantasy Football Scout Members Area.html')
+                        ]);
+
+                        if (defTeamRaw && expTeamRaw) {
+                            const { TeamStatsParser } = await import('../js/parsers/TeamStatsParser.js');
+
+                            const defStats = new TeamStatsParser().parse(new DOMParser().parseFromString(defTeamRaw, 'text/html'));
+                            const expStats = new TeamStatsParser().parse(new DOMParser().parseFromString(expTeamRaw, 'text/html'));
+
+                            // Log available teams in team stats
+                            // log(`Available Team Keys (Def): ${Object.keys(defStats).map(k => `"${k}"`).join(', ')}`);
+
+                            const teamStatsMap = DataManager.mergeTeamStats(defStats, expStats);
+                            const computed = StatCalculator.calculate(bhaPlayer, teamStatsMap, merged);
+
+                            const xGC = computed['xGC (Team)'];
+                            const shotsConc = computed['Shots Conc'];
+
+                            log(`- xGC (Team): ${xGC}`);
+                            log(`- Shots Conc (Team): ${shotsConc}`);
+
+                            if (assert(xGC > 0, `Team Stats: Found xGC (${xGC}) from Expected file`)) passed++; else failed++;
+                            if (assert(shotsConc > 0, `Team Stats: Found Shots Conc (${shotsConc}) from Defending file`)) passed++; else failed++;
+
+                        } else {
+                            log('Skipping BHA Team Check - missing one or both team files', 'pending');
+                        }
+                    } else {
+                        log('Could not find van Hecke for BHA test', 'pending');
+                        // Debug: list some players and their teams
+                        if (merged.length > 0) {
+                            log(`First player team: ${merged[0].name} - "${merged[0].team}"`);
+                        }
+                    }
+                } else {
+                    log('Skipping Integration test - missing files', 'pending');
+                }
+
+            } catch (error) {
+                log(`Critical validation error: ${error.message}`, 'fail');
+                failed++;
+            }
+
+            // Summary
+            const total = passed + failed;
+            const summaryColor = failed === 0 ? 'pass' : 'fail';
+            log('-----------------------------------');
+            log(`Tests Completed. Total: ${total}, Passed: ${passed}, Failed: ${failed}`, summaryColor);
+
+            if (failed === 0) {
+                document.body.style.backgroundColor = '#064e3b'; // Dark green bg for success
+            } else {
+                document.body.style.backgroundColor = '#450a0a'; // Dark red bg for fail
+            }
+
+            // Helper
+            async function testParser(filename, ParserClass, parserName, expectedStats) {
+                const path = `../../${filename}`;
+                log(`Fetching ${filename}...`);
+                try {
+                    const response = await fetch(path);
+                    if (!response.ok) {
+                        log(`Could not fetch ${filename} (Status: ${response.status}). Skipping ${parserName} test.`, 'pending');
+                        return; // Soft fail/skip
+                    }
+                    const html = await response.text();
+
+                    log(`Testing ${parserName}...`, 'pending');
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+
+                    const instance = new ParserClass();
+                    const players = instance.parse(doc);
+
+                    assert(players.length > 0, `${parserName}: Parsed ${players.length} players`);
+                    if (players.length > 0) {
+                        passed++;
+                        const p1 = players[0];
+                        log(`Sample: ${p1.name} - ${JSON.stringify(p1)}`);
+
+                        for (const stat of expectedStats) {
+                            const hasStat = p1[stat] !== undefined;
+                            assert(hasStat, `${parserName}: Extracted '${stat}': ${p1[stat]}`);
+                            if (hasStat) passed++; else failed++;
+                        }
+                    } else {
+                        failed++;
+                    }
+                } catch (e) {
+                    log(`Error testing ${parserName}: ${e.message}`, 'fail');
+                    failed++;
+                }
+            }
+            async function fetchRaw(path) {
+                try {
+                    const response = await fetch(path);
+                    if (response.ok) return await response.text();
+                } catch (e) { }
+                return null;
+            }
+        }
+
+        // Auto-run
+        runTests();
+    </script>
+</body>
+
+</html>

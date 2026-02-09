@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="FPL Player Analysis Tool with StatsBomb-style Radar Charts">
+    <title>FPL Radar | Player Analysis Tool</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/index.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">⚽</span>
+                <h1>FPL Radar</h1>
+            </div>
+            <p class="tagline">StatsBomb-style player analysis</p>
+        </header>
+
+        <!-- File Upload Section -->
+        <section class="upload-section" id="uploadSection">
+            <div class="upload-card">
+                <div id="autoLoadingMessage" style="display: none; text-align: center; padding: 2rem;">
+                    <h2>🔄 Auto-Loading Data...</h2>
+                    <p style="color: var(--text-muted);">Fetching files from parent directory</p>
+                </div>
+
+                <div id="manualUploadArea">
+                    <h2>📁 Upload Data Files</h2>
+                    <p>Select all Fantasy Football Scout HTML files</p>
+                    <div class="upload-area" id="uploadArea">
+                        <input type="file" id="fileInput" multiple accept=".html" hidden>
+                        <div class="upload-icon">📂</div>
+                        <p>Drag & drop files here or <span class="upload-link">browse</span></p>
+                    </div>
+                    <div class="file-status" id="fileStatus">
+                        <div class="file-item" data-file="custom-dump">
+                            <span class="status-icon">⬜</span>
+                            <span>Custom Dump (Big Chances, Creativity, Def)</span>
+                        </div>
+                        <div class="file-item" data-file="shots">
+                            <span class="status-icon">⬜</span>
+                            <span>StatsBomb Shots (Outfield)</span>
+                        </div>
+                        <div class="file-item" data-file="passes">
+                            <span class="status-icon">⬜</span>
+                            <span>StatsBomb Passes (Outfield)</span>
+                        </div>
+                        <div class="file-item" data-file="defending-team">
+                            <span class="status-icon">⬜</span>
+                            <span>Defending (Team Stats)</span>
+                        </div>
+                        <div class="file-item" data-file="expected-team">
+                            <span class="status-icon">⬜</span>
+                            <span>Expected (Team Stats)</span>
+                        </div>
+                        <div class="file-item" data-file="fixtures">
+                            <span class="status-icon">⬜</span>
+                            <span>Fixture Ticker</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="loadDataBtn" disabled>Load Data</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content -->
+        <main class="main-content" id="mainContent" style="display: none;">
+            <!-- Controls Bar -->
+            <div class="controls-bar">
+                <div class="toggle-group">
+                    <button class="toggle-btn active" data-view="attackers" id="attackersBtn">
+                        ⚔️ Attackers
+                    </button>
+                    <button class="toggle-btn" data-view="defenders" id="defendersBtn">
+                        🛡️ Defenders
+                    </button>
+                </div>
+
+                <div class="filter-group">
+
+                    <div class="filter-item" style="min-width: 140px;">
+                        <label>Min Minutes Played: <span id="minMinutesValue">0+</span></label>
+                        <input type="range" id="minTotalMinutesFilter" min="0" max="2000" value="0" step="10"
+                            style="width: 100%;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Two Column Layout -->
+            <div class="content-grid">
+                <!-- Player Table -->
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3 id="tableTitle">Attackers</h3>
+                        <div class="search-box">
+                            <input type="text" id="searchInput" placeholder="Search player...">
+                        </div>
+                    </div>
+                    <!-- Scroll Slider (Top) -->
+                    <div class="table-scroll-controls"
+                        style="padding: 0.5rem 1rem; border-bottom: 1px solid var(--border-color); display: none;">
+                        <input type="range" id="tableScrollSlider" value="0" min="0" max="100" step="1"
+                            style="width: 100%; cursor: pointer;">
+                    </div>
+                    <div class="table-wrapper">
+                        <table id="playerTable">
+                            <thead id="tableHead"></thead>
+                            <tbody id="tableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Radar Chart Panel -->
+                <div class="radar-panel">
+                    <div class="radar-header">
+                        <h3 id="radarTitle">Select a Player</h3>
+                        <div class="radar-actions">
+                            <button class="btn btn-radar-action" id="generateRadarBtn" disabled>
+                                Generate Radar
+                            </button>
+                            <button class="btn btn-radar-action" id="compareRadarBtn" disabled>
+                                Compare Players
+                            </button>
+                        </div>
+                    </div>
+                    <div class="radar-container">
+                        <canvas id="radarChart"></canvas>
+                        <div class="radar-placeholder" id="radarPlaceholder">
+                            <div class="placeholder-icon">📊</div>
+                            <p>Click on a player row and generate radar</p>
+                        </div>
+                    </div>
+                    <div class="radar-legend" id="radarLegend"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Data from Fantasy Football Scout • Visualization inspired by StatsBomb</p>
+        </footer>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+</body>
+
+</html>
