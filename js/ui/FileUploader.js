@@ -130,7 +130,18 @@ export class FileUploader {
                 await DataService.loadDataFromContent();
             }
 
-            // Success handled by Store updates which trigger other UI components
+            // Success: transition from upload view to main content
+            const uploadSection = document.getElementById('uploadSection');
+            const mainContent = document.getElementById('mainContent');
+
+            if (uploadSection) uploadSection.style.display = 'none';
+            if (mainContent) {
+                mainContent.style.display = 'flex';
+                mainContent.classList.add('fade-in');
+            }
+
+            window.scrollTo(0, 0);
+            console.log('✅ Data loaded successfully, showing main content.');
 
         } catch (error) {
             console.error('Error loading data:', error);
